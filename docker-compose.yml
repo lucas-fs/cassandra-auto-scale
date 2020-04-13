@@ -1,0 +1,67 @@
+version: "3.8"
+
+networks:
+  cluster_net:
+    external: true
+    name: cassandra-net  
+  
+services:  
+
+  ################################################################
+  # The Casandra cluster 
+  #   - cassandra-seed
+  ################################################################        
+  seed:
+    image: lucasfs/cassandra-armhf
+    environment:
+      - HEAP_NEWSIZE=12M
+      - MAX_HEAP_SIZE=64M
+      - CASSANDRA_NUM_TOKENS=16
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        window: 120s
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.labels.type == master
+    volumes:
+      - /mnt/storage/cassandra:/var/lib/cassandra 
+    networks:
+      - cluster_net
+    ports:
+      - target: 9042
+        published: 9042
+        mode: host
+
+  ################################################################
+  # The Casandra cluster 
+  #   - cassandra-node
+  ################################################################        
+  node:
+    image: lucasfs/cassandra-armhf
+    environment:
+      - SEEDS_SERVICE=seed
+      - HEAP_NEWSIZE=12M
+      - MAX_HEAP_SIZE=64M
+      - TASK_NAME={{.Task.Name}}
+      - WAIT_TIME=100
+      - CASSANDRA_NUM_TOKENS=16
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        window: 120s
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.labels.type == slave
+    volumes:
+      - /mnt/storage/cassandra:/var/lib/cassandra 
+    networks:
+      - cluster_net
+    ports:
+      - target: 9042
+        published: 9042
+        mode: host
